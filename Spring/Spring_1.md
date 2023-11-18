@@ -53,3 +53,13 @@ controller의 메서드는 Model로 부터 데이터를 받고 model에 data라�
   - 스프링 부트 템플릿엔진 기본 viewName 매핑
    - resources:templates/ +{ViewName}+ .html
 
+# build 및 실행
+
+지금까지는 intellij에서 실행한 것이고 이제 배포를 위한 .jar 파일을 만들어서 실행을 해본다.
+
+```
+gradle build
+```
+위 명령어를 통해 build가 되고 jar파일이 생성된다.
+
+배포할 때 해당 서버에서 이 jar파일 하나만 실행해주면 된다.
