@@ -38,7 +38,7 @@ domain logic(비즈니스 로직이나 DB와 관련없는 코드들) 으로부�
 
  - 적절히 디자인을 하면 모든 domain logic을 바꾸는 대신에 DAO만 바꾸기만 하면 되는 것!
 
- - persistence layer(퍼시스턴트 계층) : Database에 data를 CRUD(Create,  Read, Update, Delete) 하는 계층
+ - persistence layer(퍼시스턴트 계층) : Database에 data를 CRUD(Create,  Read, Update, Delete) 하는 계층.
 
  
 
