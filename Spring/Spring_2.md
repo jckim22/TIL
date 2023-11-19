@@ -41,7 +41,57 @@ Model-Controller는 내부적인 비즈니스 로직을 처리해야한다.
 5. hello-template를 리턴함으로서 template에서 hello-template.html 파일을 찾는다.
 6. 타임리프(템플릿 엔진)은 받은 데이터를 사용해 html을 랜더링 한 후 화면에 출력한다.
 
-![](https://velog.io/215790dd-9765-4c40-ab7c-44d40a2057a1)
+![](https://velog.velcdn.com/images/jckim22/post/9401999a-b925-4b59-b2b4-a4198e8fd65b/image.png)
+
+
 
 
 # API
+
+### Hello 클래스
+```java
+    static class Hello {
+        private String name;
+        private String aa = "asdfasdf";
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getAa() {
+            return aa;
+        }
+
+        public String getName() {
+            return name;
+        }
+    }
+```
+
+### controller
+
+```java
+   	@GetMapping("hello-api")
+    @ResponseBody
+    public Hello helloAPi(@RequestParam("name") String name){
+        Hello hello = new Hello();
+        hello.setName(name);
+        return hello; //객체를 반환
+```
+
+위처럼 @ResponseBody 어노테이션을 설정하게 되면 아래와 같은 구조로 동작한다.
+
+![](https://velog.velcdn.com/images/jckim22/post/025d3eaa-4d20-4ecc-8f01-da14e8e92ea0/image.png)
+
+controller 메소드에 ResponseBody가 붙어있는걸 확인하고 뷰리졸버 대신 HttpMessageConveter가 동작한다.
+
+만약 객체 형태라면 기본으로 탑재된 잭슨 라이브러리로 Json으로 파싱한 뒤 클라이언트에게 반환한다.
+
+위 코드에서는 파라미터로 값을 받은 뒤 객체를 생성하고 세팅하고 객체를 반환한다.
+
+그럼 아래처럼 객체가 Json 형태의 파일로 반환된 것을 볼 수 있다.
+
+![](https://velog.velcdn.com/images/jckim22/post/d7de53c4-d8c8-4bda-b9a4-760c8cae1999/image.png)
+
+
+
