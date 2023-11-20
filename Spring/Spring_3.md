@@ -16,7 +16,7 @@
 > 인터페이스를 만들어 놓으면 DB는 구현만 하면되니 옮기기 쉽다.
 
 
-# 회원 객체 -> domain
+## 회원 객체 -> domain
 
 ```java
 public class Member {
@@ -41,7 +41,9 @@ public class Member {
 }
 ```
 
-# 회원 저장소 인터페이스 -> repository
+# 회원 관리 예제(도메인, 레포지토리)
+
+## 회원 저장소 인터페이스 -> repository
 
 ```java
 public interface MemberRepository {
@@ -53,7 +55,7 @@ public interface MemberRepository {
 }
 
 ```
-# 회원 저장소 구현체 -> 메모리 형식
+## 회원 저장소 구현체 -> 메모리 형식
 
 >추후에 다른 DB로 구현할 수 있음
 
@@ -91,7 +93,7 @@ public class MemoryMemberRepository implements MemberRepository {
 
 1. ID를 key로한 member가 모여있는 Map 생성
 2. save
--> save할 때마다 sequence를 ++
+-> save할 때마다 sequence가 가산적으로 증가
 -> store에 키값과 밸류를 put
 3. findById
 -> id에 맞는 value를 반환하되 Null 일 수도 있으니 Optional로 감싸서 리턴한다.
@@ -99,3 +101,69 @@ public class MemoryMemberRepository implements MemberRepository {
 -> store의 밸류값들로 stream을 내려보내고 같은 이름이면 리턴한다.
 5. findAll
 -> 모든 value 값을 ArrayList형식으로 반환
+
+# 회원 관리 예제(도메인, 레포지토리) - 테스트
+
+
+## 회원 저장소 구현체 -> 메모리 형식 -> 테스트
+
+```java
+public class MemoryMemberRepositoryTest {
+
+    MemoryMemberRepository repository = new MemoryMemberRepository();
+
+    @AfterEach
+    public void afterEach(){
+        repository.clearStore();
+    }
+
+    @Test
+    public void save() {
+        Member member = new Member();
+        member.setName("spring");
+
+        repository.save(member);
+
+        Member result = repository.findById(member.getId()).get();
+//        Assertions.assertEquals(member,result);
+        Assertions.assertThat(member).isEqualTo(result);
+
+    }
+
+    @Test
+    public void findByName() {
+        Member member1 = new Member();
+        member1.setName("spring1");
+        repository.save(member1);
+
+        Member member2 = new Member();
+        member2.setName("spring2");
+        repository.save(member2);
+
+        Member result = repository.findByName("spring1").get();
+
+        Assertions.assertThat(result).isEqualTo(member1);
+    }
+
+    @Test
+    public void findAll() {
+        Member member1 = new Member();
+        member1.setName("spring1");
+        repository.save(member1);
+
+        Member member2 = new Member();
+        member2.setName("spring2");
+        repository.save(member2);
+
+        List<Member> result = repository.findAll();
+
+        Assertions.assertThat(result.size()).isEqualTo(2);
+    }
+}
+```
+메서드 단위, 클래스 단위로 테스트 할 수 있다.
+
+>각 테스트가 끝날 때마다 afterEach로 clear 메소드를 호출하여 데이터를 clear 해주어야 한다. (clear 메소드는 따로 생성했다.)
+
+>이 테스트 코드를 개발 전에 먼저 작성하고 그 틀에 맞추는 형식으로 개발하는 방법이 테스트 주도 개발(TDD) 이다,
+
