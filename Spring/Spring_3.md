@@ -167,3 +167,168 @@ public class MemoryMemberRepositoryTest {
 
 >이 테스트 코드를 개발 전에 먼저 작성하고 그 틀에 맞추는 형식으로 개발하는 방법이 테스트 주도 개발(TDD) 이다,
 
+
+# 회원 관리 예제(서비스)
+
+
+>#### InteliJ 유용한 커맨드
+command+option+v: return 형식에 맞는 변수 자동 선언
+command+shift+enter: ; 후 줄바꿈
+control+T: Extract method와 같은 리팩토링 기능들
+command+n: getter, setter, 생성자 등
+
+```java
+public class MemberService {
+
+    private final MemberRepository memberRepository = new MemoryMemberRepository();
+
+    /**
+     * 회원가입
+     *
+     * @param member
+     * @return
+     */
+    public Long join(Member member) {
+        //같은 이름이 있는 중복 회원X
+        validateDuplicateMember(member);
+        
+        memberRepository.save(member);
+        return member.getId();
+    }
+
+    private void validateDuplicateMember(Member member) {
+        memberRepository.findByName(member.getName())
+                .ifPresent(m -> {
+                    throw new IllegalArgumentException("이미 존재하는 회원입니다.");
+                });
+    }
+
+    /**
+     * 전체 회원 조회
+     */
+    public List<Member> findMembers() {
+        return memberRepository.findAll();
+    }
+
+    public Optional<Member> findOne(Long memberId) {
+        return memberRepository.findById(memberId);
+    }
+}
+```
+
+Optional의 isPresent를 사용해서 중복처리를 했다.
+findMembers와 findOne은 지금은 그저 기존에 repository의 메소드를 한번 더 감싸준 형태지만, 네이밍이 서비스에 가까운 만큼 서비스 로직이라고 생각해야한다.
+
+네이밍부터 엄연히 차이가 있다.
+
+>#### ex)
+findById는 도메인 네이밍
+findOne, findMembers는 서비스에 더 가까운 네이밍
+
+
+# 회원 관리 예제(서비스) - 테스트
+
+```java
+class MemberServiceTest {
+
+    MemberService memberService;
+    MemoryMemberRepository memberRepository;
+
+    @BeforeEach
+    public void beforeEach() {
+        memberRepository = new MemoryMemberRepository();
+        memberService = new MemberService(memberRepository);
+    }
+
+    @AfterEach
+    public void afterEach() {
+        memberRepository.clearStore();
+    }
+
+    @Test
+    void 회원가입() {
+        //given
+        Member member = new Member();
+        member.setName("spring");
+
+        //when
+        Long saveId = memberService.join(member);
+
+        //then
+        Member findMember = memberService.findOne(saveId).get();
+        org.assertj.core.api.Assertions.assertThat(member.getName()).isEqualTo(findMember.getName());
+
+    }
+
+    @Test
+    public void 중복_회원_예외() {
+        //given
+        Member member1 = new Member();
+        member1.setName("spring");
+
+        Member member2 = new Member();
+        member2.setName("spring");
+
+        //when
+        memberService.join(member1);
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, ()
+                -> memberService.join(member2));
+
+        org.assertj.core.api.Assertions.assertThat(
+                e.getMessage()).isEqualTo("이미 존재하는 회원입니다.");
+
+
+//        try {
+//            memberService.join(member2);
+//            fail();
+//        } catch (IllegalArgumentException e) {
+//            org.assertj.core.api.Assertions.assertThat(
+//                    e.getMessage()).isEqualTo("이미 존재하는 회원입니다.");
+//        }
+
+        //then
+
+
+    }
+
+    @Test
+    void findMembers() {
+    }
+
+    @Test
+    void findOne() {
+    }
+}
+```
+
+기존에는 MemberService에서 Repository를 생성했는데 그렇게 되면 테스트할 때 또 레포지토리를 따로 생성해야 했었다.
+
+그래서 외부에서 레포지토리를 받는 형식으로 바꾸었다.
+아래 코드를 보면
+
+```java
+public class MemberService {
+
+    private final MemberRepository memberRepository;
+
+    public MemberService(MemberRepository memberRepository) {
+        this.memberRepository = memberRepository;
+    }
+```
+
+생성자로 서비스 입장에서 외부에서 레포지토리를 받는다.
+그리고 테스트 코드에서 테스트 시작전마다 레포지토리를 서비스에 넣어준다.
+
+>이렇게 서비스 입장에서 외부에서 넣어주는 것은 **Dependency Injection** 줄여서 DI라고 한다.
+
+또한 테스트 메서드 명은 통상적으로 한글도 허용한다.
+예외를 확인하는 것이 더 중요하기 때문에 asserThrows로 예외를 확인한다.
+
+>try-catch로도 예외를 잡아낼 수 있다.
+예외 명이 같은지 isEquals로 확인하자
+메서드 단위, 클래스 단위로 테스트 할 수 있다.
+
+>각 테스트가 끝날 때마다 afterEach로 clear 메소드를 호출하여 데이터를 clear 해주어야 한다. (clear 메소드는 따로 생성했다.)
+
+>이 테스트 코드를 개발 전에 먼저 작성하고 그 틀에 맞추는 형식으로 개발하는 방법이 테스트 주도 개발(TDD) 이다,
+
