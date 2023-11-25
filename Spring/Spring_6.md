@@ -262,3 +262,60 @@ MemberService는 MemberRepository를 의존하고 있고 그것에 구현체는 
 
 회원을 등록하고 DB에 결과가 잘 입력되는지 확인하자.
 데이터를 DB에 저장하므로 스프링 서버를 다시 실행해도 데이터가 안전하게 저장된다.
+
+# JDBC_TEMPLATE
+
+JDBC를 순수하게 구현하고 있자니 중복된 코드들이 너무 많았다.
+
+```java
+public class JdbcTemplateMemberRepository implements MemberRepository {
+    private final JdbcTemplate jdbcTemplate;
+
+    public JdbcTemplateMemberRepository(DataSource dataSource) {
+        jdbcTemplate = new JdbcTemplate(dataSource);
+    }
+
+    @Override
+    public Member save(Member member) {
+        SimpleJdbcInsert jdbcInsert = new SimpleJdbcInsert(jdbcTemplate);
+        jdbcInsert.withTableName("member").usingGeneratedKeyColumns("id");
+
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("name", member.getName());
+        Number key = jdbcInsert.executeAndReturnKey(new
+                MapSqlParameterSource(parameters));
+        member.setId(key.longValue());
+        return member;
+    }
+
+    @Override
+    public Optional<Member> findById(Long id) {
+        List<Member> result = jdbcTemplate.query("select * from member where id = ?", memberRowMapper(), id);
+        return result.stream().findAny();
+    }
+
+    @Override
+    public List<Member> findAll() {
+        return jdbcTemplate.query("select * from member", memberRowMapper());
+    }
+
+    @Override
+    public Optional<Member> findByName(String name) {
+        List<Member> result = jdbcTemplate.query("select * from member where name = ? ", memberRowMapper(), name);
+        return result.stream().findAny();
+    }
+
+    private RowMapper<Member> memberRowMapper() {
+        return (rs, rowNum) -> {
+            Member member = new Member();
+            member.setId(rs.getLong("id"));
+            member.setName(rs.getString("name"));
+            return member;
+        };
+    }
+}
+```
+
+위는 JDBC Template로 작성한 구현체이다.
+순수 JDBC를 활용할 때보다 중복된 코드가 줄었다.
+RowMapper를 통해서 매핑을 해주기 때문이다.
