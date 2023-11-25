@@ -69,3 +69,28 @@ memberService 와 memberRepository 가 스프링 컨테이너에 스프링 빈�
 > 스프링은 스프링 컨테이너에 스프링 빈을 등록할 때, 기본으로 싱글톤으로 등록한다(유일하게 하나만 등록해서 공유한다) 따라서 같은 스프링 빈이면 모두 같은 인스턴스다. 설정으로 싱글톤이 아니게 설정할 수 있지만, 특별한 경우를 제외하면 대부분 싱글톤을 사용한다.
 
 >결론적으로 같은 객체를 재사용하고 하나의 객체로만 사용하기 위해 (싱글톤) Denpendency Injection을 사용한다.
+
+# 컴포넌트 스캔을 사용하지 않고 스프링 빈 등록하기
+
+```java
+
+
+@Configuration
+public class SpringConfig {
+
+    @Bean
+    public MemberService memberService(){
+        return new MemberService(memberRepository());
+    }
+
+    @Bean
+    public MemberRepository memberRepository(){
+        return new MemoryMemberRepository();
+    }
+}
+```
+
+이런식으로 설정할 수 있다.
+
+>컴포넌트 스캔은 일반적으로 정형화된 구조에서 간편하다는 장점이 있지만 이런식으로 config파일을 설정해주면 구현체가 변경되거나 구조의 변경이있을 때 수정에 매우 용이하다.
+예시로 현재 Memory로 데이터를 저장하고 있는데 이것을 DB구현체로 변경하게 되면 MemoryMemberRepository에서 DBMemoryRepository로 변경만 해주면 된다.
