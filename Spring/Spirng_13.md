@@ -93,3 +93,87 @@ public class OrderServiceImpl implements OrderService{
 어떻게 하면 구현체 없이 돌아가게 할 수 있을까 ?
 
 >누군가가 구현체를 밖에서 대신 주입을 해줘야한다. (Dependency Injection)
+
+# 해결
+
+
+
+## 관심사의 분리
+- 애플리케이션을 하나의 공연이라 생각해보자.
+- 각각의 인터페이스를 배역(배우 역할)이라 생각하자.
+- 그런데! 실제 배역 맞는 배우를 선택하는 것은 누가 하는가?
+   - 로미오와 줄리엣 공연을 하면 로미오 역할을 누가 할지 줄리엣 역할을 누가 할지는 배우들이 정하는게 아니다. 
+   - 이 전 코드는 마치 로미오 역할(인터페이스)을 하는 레오나르도 디카프리오(구현체, 배우)가 줄리엣 역할(인터페이스)을 하는 여자 주인공(구현체, 배우)을 직접 초빙하는 것과 같다. 
+   - 디카프리오는 공연도 해야하고 동시에 여자 주 인공도 공연에 직접 초빙해야 하는 **다양한 책임**을 가지고 있다.
+   
+**관심사를 분리하자**
+- 배우는 본인의 역할인 배역을 수행하는 것에만 집중해야 한다.
+- 디카프리오는 어떤 여자 주인공이 선택되더라도 똑같이 공연을 할 수 있어야 한다.
+- 공연을 구성하고, 담당 배우를 섭외하고, 역할에 맞는 배우를 지정하는 책임을 담당하는 별도의 **공연 기획자**가 나 올시점이다.
+- 공연 기획자를 만들고, 배우와 공연 기획자의 책임을 확실히 분리하자.
+
+```java
+public class AppConfig {
+
+    public MemberService memberService() {
+        return new MemberServiceImpl(new MemoryMemberRepository());
+    }
+
+    public OrderService orderService() {
+        return new OrderServiceImpl(new MemoryMemberRepository(), new RateDiscountPolicy());
+    }
+}
+```
+
+기획자 역할을 하는 AppConfig를 만들어서 기존에 인터페이스 구현체에게 사용하고픈 객체를 넣어주었다.
+
+이로서 디카프리오는 연기에만 집중하면 되게 되었다.
+
+### OrderServiceImpl
+
+```java
+public class OrderServiceImpl implements OrderService{
+    private MemberRepository memberRepository;
+    private DiscountPolicy discountPolicy;
+//    private final DiscountPolicy discountPolicy = new FixDiscountPolicy();
+
+    public OrderServiceImpl(MemberRepository memberRepository, DiscountPolicy discountPolicy) {
+        this.memberRepository = memberRepository;
+        this.discountPolicy = discountPolicy;
+    }
+
+```
+
+
+- 설계 변경으로 `OrderServiceImpl` 은 `FixDiscountPolicy` 를 의존하지 않는다! 단지 `DiscountPolicy` 인터페이스만 의존한다.
+- `OrderServiceImpl` 입장에서 생성자를 통해 어떤 구현 객체가 들어올지(주입될지)는 알 수 없다.
+- `OrderServiceImpl` 의 생성자를 통해서 어떤 구현 객체을 주입할지는 오직 외부( `AppConfig` )에서 결정한다.
+- `OrderServiceImpl` 은 이제부터 실행에만 집중하면 된다.
+- `OrderServiceImpl` 에는 `MemoryMemberRepository`,` FixDiscountPolicy` 객체의 의존관계가 주 입된다.
+
+
+```java
+class OrderServiceTest {
+
+    MemberService memberService;
+    OrderService orderService;
+
+    @BeforeEach
+    public void beforeEach() {
+        AppConfig appConfig = new AppConfig();
+        memberService = appConfig.memberService();
+        orderService = appConfig.orderService();
+    }
+```
+
+위처럼 구현체의존하지 않는 테스트 코드 또한 만들 수 있다.
+
+# **정리**
+- AppConfig를 통해서 관심사를 확실하게 분리했다.
+- 배역, 배우를 생각해보자.
+- AppConfig는 공연 기획자다.
+- AppConfig는 구체 클래스를 선택한다.
+- 배역에 맞는 담당 배우를 선택한다. 애플리케이션이 어떻게 동작해야 할 지 전체 구성을 책임진다.
+- 이제 각 배우들은 담당 기능을 실행하는 책임만 지면 된다.
+- `OrderServiceImpl` 은 기능을 실행하는 책임만 지면 된다.
+
