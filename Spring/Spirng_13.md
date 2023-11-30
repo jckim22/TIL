@@ -94,6 +94,7 @@ public class OrderServiceImpl implements OrderService{
 
 >누군가가 구현체를 밖에서 대신 주입을 해줘야한다. (Dependency Injection)
 
+
 # 해결
 
 
@@ -176,4 +177,65 @@ class OrderServiceTest {
 - 배역에 맞는 담당 배우를 선택한다. 애플리케이션이 어떻게 동작해야 할 지 전체 구성을 책임진다.
 - 이제 각 배우들은 담당 기능을 실행하는 책임만 지면 된다.
 - `OrderServiceImpl` 은 기능을 실행하는 책임만 지면 된다.
+
+## 리팩토링
+
+그리고 아래와 같이 리팩토링을 진행함으로서 
+```java
+public class AppConfig {
+
+    public MemberService memberService(){
+        return new MemberServiceImpl(memberRepository());
+    }
+
+    public MemberRepository memberRepository() {
+        return new MemoryMemberRepository();
+    }
+
+    public OrderService orderService() {
+        return new OrderServiceImpl(memberRepository(), discountPolicy());
+    }
+
+    public DiscountPolicy discountPolicy(){
+        return new RateDiscountPolicy();
+    }
+}
+```
+아래와 같은 확실한 구조가 생겼다.
+뭔가 수정할 때 우리는 구성 영역(기획자)만 건드리면 된다.
+
+![업로드중..](blob:https://velog.io/a37968fb-d4c8-40cb-8d51-5ce47f108f82)
+
+## 전체 흐름
+
+
+- 지금까지의 흐름을 정리해보자.
+- 새로운 할인 정책 개발
+- 새로운 할인 정책 적용과 문제점 관심사의 분리
+- AppConfig 리팩터링
+- 새로운 구조와 할인 정책 적용
+**새로운 할인 정책 개발**
+>다형성 덕분에 새로운 정률 할인 정책 코드를 추가로 개발하는 것 자체는 아무 문제가 없음
+
+**새로운 할인 정책 적용과 문제점**
+>새로 개발한 정률 할인 정책을 적용하려고 하니 **클라이언트 코드**인 주문 서비스 구현체도 함께 변경해야함
+주문 서비스 클라이언트가 인터페이스인 `DiscountPolicy` 뿐만 아니라, 구체 클래스인 `FixDiscountPolicy` 도 함께 의존 **DIP 위반**
+	
+**관심사의 분리**
+- 애플리케이션을 하나의 공연으로 생각
+- 기존에는 클라이언트가 의존하는 서버 구현 객체를 직접 생성하고, 실행함
+비유를 하면 기존에는 남자 주인공 배우가 공연도 하고, 동시에 여자 주인공도 직접 초빙하는 다양한 책임을 가지 고 있음
+- 공연을 구성하고, 담당 배우를 섭외하고, 지정하는 책임을 담당하는 별도의 **공연 기획자**가 나올 시점
+- 공연 기획자인 AppConfig가 등장
+- AppConfig는 애플리케이션의 전체 동작 방식을 구성(config)하기 위해, **구현 객체를 생성**하고, **연결**하는 책임 이제부터 클라이언트 객체는 자신의 역할을 실행하는 것만 집중, 권한이 줄어듬(책임이 명확해짐)
+
+**AppConfig 리팩터링**
+- 구성 정보에서 역할과 구현을 명확하게 분리 역할이 잘 드러남
+- 중복 제거
+
+**새로운 구조와 할인 정책 적용**
+- 정액 할인 정책 정률% 할인 정책으로 변경
+- AppConfig의 등장으로 애플리케이션이 크게 **사용 영역**과, 객체를 생성하고 **구성(Configuration)하는 영역**으 로 분리
+- 할인 정책을 변경해도 AppConfig가 있는 구성 영역만 변경하면 됨, 사용 영역은 변경할 필요가 없음. 물론 클라 이언트 코드인 주문 서비스 코드도 변경하지 않음
+
 
