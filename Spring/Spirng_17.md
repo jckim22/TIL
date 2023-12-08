@@ -67,3 +67,52 @@ spring이 아니면 필드에 접근할 수가 없기 때문이다.
 ## 일반 메서드 주입
 
 일반적으로 잘 사용되지 않는다.
+
+
+## Option
+
+```java
+    @Test
+    void AutowiredOption(){
+        ApplicationContext ac = new AnnotationConfigApplicationContext(TestBean.class);
+    }
+
+    static class TestBean {
+
+        //의존관계가 없으니 호출이 안됨
+        @Autowired(required = false)
+        public void setNoBean1(Member noBean1){
+            System.out.println("noBean1 = " + noBean1);;
+        }
+
+        //Null이 들어옴
+        @Autowired
+        public void setNoBean2(@Nullable Member noBean2){
+            System.out.println("noBean1 = "+noBean2);
+        }
+
+        //Optional.empty가 들어옴
+        @Autowired(required = false)
+        public void setNoBean3(Optional<Member> noBean3){
+            System.out.println("noBean3 = " + noBean3);
+        }
+    }
+```
+
+위와 같이 required = false로 호출을 막거나 @Nullable로 Null처리하거나 Optional<>로 Optioanl로 처리할 수 있다.
+
+### 생성자를 써야하는 이유
+
+순수한 자바 언어의 특성을 살리자 -> 테스트를 위해
+
+#### 1. 불변
+
+한번 설정해놓으면 변경할 수 없다
+-> 연극도 첫 배역을 공연 중간에 수정하지는 않는다.
+
+#### 2. 누락
+
+세터를 사용하면 깜빡하고 세터를 설정하지 않거나 호출하지 않아서 누락이 날 수 있다.
+생성자를 사용하면 컴파일 단계에서 오류가 발생해 깜빡할 수가 없다.
+
+또한 final 키워드를 사용해서 생성자에서 초기화 되지 않았을 때 컴파일 오류를 낼 수 있다.
