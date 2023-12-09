@@ -124,3 +124,80 @@ afterPropertiessSet을 이용해서 의존관계 주입이 끝나면 호출이 �
 >객체의 생성과 초기화가 명확히 분리된 것을 알 수 있다.
 
 하지만 인터페이스 방식은 너무 오래된 방식이라서 잘 사용되지 않는다.
+
+**초기화, 소멸 인터페이스 단점**
+- 이 인터페이스는 스프링 전용 인터페이스다. 해당 코드가 스프링 전용 인터페이스에 의존한다.
+- 초기화, 소멸 메서드의 이름을 변경할 수 없다.
+- 내가 코드를 고칠 수 없는 외부 라이브러리에 적용할 수 없다.
+
+# 빈 등록 방식
+
+```java
+        @Bean(initMethod = "init", destroyMethod = "close")
+        public NetworkClient networkClient(){
+            NetworkClient networkClient = new NetworkClient();
+            networkClient.setUrl("http://hello-spring.dev");
+            return networkClient;
+        }
+```
+
+```java
+    public void init() {
+        System.out.println("NetworkClient.afterPropertiesSet");
+        connect();
+        call("초기화 연결 메시지");
+    }
+
+    public void close() {
+        System.out.println("NetworkClient.destroy");
+        disconnect();
+    }
+```
+
+위처럼 빈 등록방식을 이용할 수도 있다.
+
+**설정 정보 사용 특징**
+- 메서드 이름을 자유롭게 줄 수 있다.
+- 스프링 빈이 스프링 코드에 의존하지 않는다.
+- 코드가 아니라 설정 정보를 사용하기 때문에 코드를 고칠 수 없는 외부 라이브러리에도 초기화, 종료 메서드를 적 용할 수 있다.
+
+
+**종료 메서드 추론**
+- `@Bean의 destroyMethod` 속성에는 아주 특별한 기능이 있다.
+- 라이브러리는 대부분 `close` , `shutdown` 이라는 이름의 종료 메서드를 사용한다.
+- @Bean의 `destroyMethod` 는 기본값이 `(inferred)` (추론)으로 등록되어 있다.
+- 이 추론 기능은 `close` , `shutdown` 라는 이름의 메서드를 자동으로 호출해준다. 이름 그대로 종료 메서드를 추 론해서 호출해준다.
+- 따라서 직접 스프링 빈으로 등록하면 종료 메서드는 따로 적어주지 않아도 잘 동작한다.
+- 추론 기능을 사용하기 싫으면 `destroyMethod=""` 처럼 빈 공백을 지정하면 된다.
+
+# 어노테이션
+
+
+```java
+    @PostConstruct
+    public void init() {
+        System.out.println("NetworkClient.afterPropertiesSet");
+        connect();
+        call("초기화 연결 메시지");
+    }
+
+    @PreDestroy
+    public void close() {
+        System.out.println("NetworkClient.destroy");
+        disconnect();
+    }
+```
+
+위와 같이 설정하면 끝이다.
+
+**@PostConstruct, @PreDestroy 애노테이션 특징**
+- 최신 스프링에서 가장 권장하는 방법이다.
+- 애노테이션 하나만 붙이면 되므로 매우 편리하다.
+- 패키지를 잘 보면 `javax.annotation.PostConstruct` 이다. 스프링에 종속적인 기술이 아니라 JSR-250 라는 자바 표준이다. 따라서 스프링이 아닌 다른 컨테이너에서도 동작한다.
+- 컴포넌트 스캔과 잘 어울린다.
+- 유일한 단점은 외부 라이브러리에는 적용하지 못한다는 것이다.(코드를 건들 수 없기 때문에) 외부 라이브러리를 초기화, 종료 해야 하면 @Bean의 기능을 사용하자.
+
+
+**정리**
+**@PostConstruct, @PreDestroy 애노테이션을 사용하자**
+- 코드를 고칠 수 없는 외부 라이브러리를 초기화, 종료해야 하면 `@Bean` 의 `initMethod` , `destroyMethod` 를 사용하자.
