@@ -716,3 +716,164 @@ typeMismatch=타입 오류입니다.
 
 **정리**
 메시지 코드 생성 전략은 그냥 만들어진 것이 아니다. 조금 뒤에서 Bean Validation을 학습하면 그 진가를 더 확인할 수 있다.
+
+## validator(검증 로직) 분리 1
+
+**목표**
+복잡한 검증 로직을 별도로 분리하자.
+컨트롤러에서 검증 로직이 차지하는 부분은 매우 크다. 이런 경우 별도의 클래스로 역할을 분리하는 것이 좋다. 그리고 이렇게 분리한 검증 로직을 재사용 할 수도 있다.
+
+
+
+스프링은 검증을 체계적으로 제공하기 위해 다음 인터페이스를 제공한다. 
+```java
+ public interface Validator {
+     boolean supports(Class<?> clazz);
+     void validate(Object target, Errors errors);
+}
+ ```
+ `supports() {}` : 해당 검증기를 지원하는 여부 확인(뒤에서 설명)
+`validate(Object target, Errors errors)` : 검증 대상 객체와 `BindingResult`
+
+```java
+@Component
+public class ItemValidator implements Validator {
+
+    @Override
+    public boolean supports(Class<?> clazz) {
+        return Item.class.isAssignableFrom(clazz);
+        // item == clazz 인지
+        // item == subItem 인지
+    }
+
+    @Override
+    public void validate(Object target, Errors errors) {
+        Item item = (Item) target;
+
+        if (!StringUtils.hasText(item.getItemName())) {
+            errors.rejectValue("itemName", "required");
+        }
+        if (item.getPrice() == null || item.getPrice() < 1000 || item.getPrice() > 1000000) {
+            errors.rejectValue("price", "range", new Object[]{1000, 10000000}, null);
+        }
+        if (item.getQuantity() == null || item.getQuantity() >= 9999) {
+            errors.rejectValue("quantity", "max", new Object[]{9999}, null);
+        }
+
+        //특정 필드가 아닌 복합 룰 검증
+        if (item.getPrice() != null && item.getQuantity() != null) {
+            int resultPrice = item.getPrice() * item.getQuantity();
+            if (resultPrice < 10000) {
+                errors.reject("totalPriceMin", new Object[]{10000, resultPrice}, null);
+            }
+        }
+    }
+}
+
+```
+컴포넌트로 등록했기 때문에 컨트롤러에서 오토와이어로 주입 받을 수 있었다.
+
+
+
+```java
+    public String addItemV5(@ModelAttribute Item item, BindingResult bindingResult, RedirectAttributes redirectAttributes, Model model) {
+
+        itemValidator.validate(item, bindingResult);
+
+        //검증에 실패하면 다시 입력 폼으로
+        if (bindingResult.hasErrors()) {
+            log.info("errors={} ", bindingResult);
+            return "validation/v2/addForm";
+        }
+
+        //성공 로직
+        Item savedItem = itemRepository.save(item);
+        redirectAttributes.addAttribute("itemId", savedItem.getId());
+        redirectAttributes.addAttribute("status", true);
+        return "redirect:/validation/v2/items/{itemId}";
+    }
+```
+훨씬 로직이 간단해진 것을 볼 수 있다.
+
+
+
+# Validator 분리2
+스프링이 `Validator` 인터페이스를 별도로 제공하는 이유는 체계적으로 검증 기능을 도입하기 위해서다. 그런데 앞 에서는 검증기를 직접 불러서 사용했고, 이렇게 사용해도 된다. 그런데 `Validator` 인터페이스를 사용해서 검증기를 만들면 스프링의 추가적인 도움을 받을 수 있다.
+
+
+**WebDataBinder를 통해서 사용하기**
+`WebDataBinder` 는 스프링의 파라미터 바인딩의 역할을 해주고 검증 기능도 내부에 포함한다.
+
+```java
+    @InitBinder
+    public void init(WebDataBinder dataBinder) {
+        dataBinder.addValidators(itemValidator);
+    }
+```
+이렇게 `WebDataBinder` 에 검증기를 추가하면 해당 컨트롤러에서는 검증기를 자동으로 적용할 수 있다. `
+- @InitBinder` 해당 컨트롤러에만 영향을 준다. 
+
+```java
+    @PostMapping("/add")
+    public String addItemV6(@Validated @ModelAttribute Item item,
+                            BindingResult bindingResult, RedirectAttributes redirectAttributes,
+                            Model model) {
+
+        //검증에 실패하면 다시 입력 폼으로
+        if (bindingResult.hasErrors()) {
+            log.info("errors={} ", bindingResult);
+            return "validation/v2/addForm";
+        }
+
+        //성공 로직
+        Item savedItem = itemRepository.save(item);
+        redirectAttributes.addAttribute("itemId", savedItem.getId());
+        redirectAttributes.addAttribute("status", true);
+        return "redirect:/validation/v2/items/{itemId}";
+    }
+```
+
+validator를 직접 호출하는 부분이 사라지고, 대신에 검증 대상 앞에 `@Validated` 가 붙었다.
+
+
+
+**동작 방식**
+`@Validated` 는 검증기를 실행하라는 애노테이션이다.
+이 애노테이션이 붙으면 앞서 `WebDataBinder` 에 등록한 검증기를 찾아서 실행한다. 그런데 여러 검증기를 등록한다 면 그 중에 어떤 검증기가 실행되어야 할지 구분이 필요하다. 이때 `supports()` 가 사용된다. 여기서는
+`supports(Item.class)` 호출되고, 결과가 `true` 이므로 `ItemValidator` 의 `validate()` 가 호출된다.
+
+```java
+ @Component
+ public class ItemValidator implements Validator {
+     @Override
+     public boolean supports(Class<?> clazz) {
+         return Item.class.isAssignableFrom(clazz);
+     }
+@Override
+     public void validate(Object target, Errors errors) {...}
+ }
+```
+그러니까 자동으로 컴포넌트로 등록된 검증기 중에서 Class에 주입 받아서 해당 validator가 실행된다.
+
+```java
+ @SpringBootApplication
+ public class ItemServiceApplication implements WebMvcConfigurer {
+     public static void main(String[] args) {
+         SpringApplication.run(ItemServiceApplication.class, args);
+}
+     @Override
+     public Validator getValidator() {
+         return new ItemValidator();
+     }
+}
+```
+
+위처럼 하면 글로벌로 등록이 된다.
+그래서
+```java
+    @InitBinder
+    public void init(WebDataBinder dataBinder) {
+        dataBinder.addValidators(itemValidator);
+    }
+```
+위처럼 별도로 WebDataBinder를 등록할 필요가 없게 된다.
