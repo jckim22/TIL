@@ -659,3 +659,292 @@ private BooleanExpression nameLike(String nameCond) {
 ```
 
 훨씬 좋은 가독성을 갖게 되었다.
+
+
+# WEB 개발
+
+### Home화면
+
+```java
+@Controller
+@Slf4j
+public class HomeController {
+    @RequestMapping("/")
+    public String home(){
+        log.info("home controller");
+        return "home";
+    }
+}
+```
+
+### 멤버 컨트롤러
+```java
+@Controller
+@RequiredArgsConstructor
+public class MemberController {
+    private final MemberService memberService;
+
+    @GetMapping("/members/new")
+    public String createForm(Model model){
+        model.addAttribute("memberForm", new MemberForm());
+        return "members/createMemberForm";
+    }
+
+    /**
+     *
+     * BindingResult로 바인디 된 결과를 확인
+     * 에러가 있으면 creatememberForm으로 가서 그 곳에서 에러에 따라 다른 걸 랜더링함
+     */
+    @PostMapping("/members/new")
+    public String create(@Valid @ModelAttribute MemberForm form, BindingResult result){
+
+        if(result.hasErrors()){
+            return "members/createMemberForm";
+        }
+
+        Address address = new Address(form.getCity(), form.getStreet(), form.getZipcode());
+
+        Member member = new Member();
+        member.setName(form.getName());
+        member.setAddress(address);
+
+        memberService.join(member);
+        return "redirect:/";
+    }
+
+    /*
+    사실 여기서도 엔티티를 직접 쓰는 것보다는 DTO를 쓰는 것이 좋음
+     */
+    @GetMapping("/members")
+    public String list(Model model){
+        List<Member> members = memberService.findMembers();
+        model.addAttribute("members", members);
+        return "members/memberList";
+    }
+}
+
+```
+
+#### MemberDto와 @Valid
+
+```java
+@Getter @Setter
+public class MemberForm {
+
+    @NotEmpty(message = "회원 이르은 필수 입니다")
+    private String name;
+
+    private String city;
+    private String street;
+    private String zipcode;
+}
+
+```
+
+Dto에 @NotEmpty로 검증 어노테이션을 달고
+컨트롤러에서 @Valid로 검증한다.
+그리고 BindingResult에 바인딩 결과를 담고
+거기에 에러가 있으면 그 결과값을 갖고 모델에 담아 바로 랜더링을 하러 간다.
+
+### Item 컨트롤러
+```java
+@Controller
+@RequiredArgsConstructor
+public class ItemController {
+
+    private final ItemService itemService;
+
+    @GetMapping("/items/new")
+    public String createForm(Model model) {
+        model.addAttribute("form", new BookForm());
+        return "items/createItemForm";
+    }
+
+    //Setter말고 CreateItem처럼 하는 것이 좋음
+    @PostMapping("/items/new")
+    public String create(@ModelAttribute BookForm form) {
+        Book book = new Book();
+        book.setName(form.getName());
+        book.setPrice(form.getPrice());
+        book.setStockQuantity(form.getStockQuantity());
+        book.setAuthor(form.getAuthor());
+        book.setIsbn(form.getIsbn());
+
+        itemService.saveItem(book);
+        return "redirect:/";
+    }
+
+    @GetMapping("/items")
+    public String list(Model model){
+        List<Item> items = itemService.findItems();
+        model.addAttribute("items", items);
+        return "items/itemList";
+    }
+
+    @GetMapping("/items/{itemId}/edit")
+    public String updateItemForm(@PathVariable("itemId") Long itemId, Model model){
+        Book item = (Book) itemService.findOne(itemId);
+
+        BookForm form = new BookForm();
+        form.setId(item.getId());
+        form.setName(item.getName());
+        form.setPrice(item.getPrice());
+        form.setStockQuantity(item.getStockQuantity());
+        form.setAuthor(item.getAuthor());
+        form.setIsbn(item.getIsbn());
+
+        model.addAttribute("form", form);
+        return "items/updateItemForm";
+    }
+
+    @PostMapping("/items/{itemId}/edit")
+    public String updateItem(@PathVariable("itemId") Long id, @ModelAttribute("form") UpdateItemDto itemDto){
+
+        itemService.updateItem(id, itemDto);
+        return "redirect:/items";
+
+    }
+}
+
+```
+
+여기서 수정에 주목해보자
+
+수정에는 2가지 있다.
+### 변경 감지와 병합
+
+일단 흔히 하는 변경 방법은 변경 감지이다.
+영속성 컨텍스트에 담겨져있는 객체를 수정하고 커밋하기만 하면 변경을 감지하고 수정이 된다.
+
+그래서 UpdateDto를 만들고
+```java
+@Getter
+@Setter
+public class UpdateItemDto {
+    private String name;
+    private int price;
+    private int stockQuantity;
+}
+
+```
+아래처럼 서비스에서 트랜잭션을 걸어 업데이트를 하면 된다.
+
+```java
+    @Transactional
+    public void updateItem(Long itemId, UpdateItemDto itemParam){
+        Book findItem = (Book) itemRepository.findOne(itemId);
+        findItem.setName(itemParam.getName());
+        findItem.setPrice(itemParam.getPrice());
+        findItem.setStockQuantity(itemParam.getStockQuantity());
+    }
+```
+
+근데 merge라는 것이 있다.
+
+**준영속 엔티티?**
+영속성 컨텍스트가 더는 관리하지 않는 엔티티를 말한다.
+(여기서는 `itemService.saveItem(book)` 에서 수정을 시도하는 `Book` 객체다. `Book` 객체는 이미 DB에 한번 저장되어서 식별자가 존재한다. 이렇게 임의로 만들어낸 엔티티도 기존 식별자를 가지고 있으면 준영속 엔티티로 볼 수 있다.)
+
+**한마디로 이미 한번 영속성 컨텍스트에 있다가 DB로 갔는데 다시 같은 식별자에 새로운 객체가 생기면 그 객체가 바로 준영속 엔티티이다.**
+
+
+![](https://velog.velcdn.com/images/jckim22/post/2b426f4e-e29f-4c6a-8cd1-7b86b7bfa93f/image.png)
+**병합 동작 방식**
+1. `merge()` 를 실행한다.
+2. 파라미터로 넘어온 준영속 엔티티의 식별자 값으로 1차 캐시에서 엔티티를 조회한다.
+2-1. 만약 1차 캐시에 엔티티가 없으면 데이터베이스에서 엔티티를 조회하고, 1차 캐시에 저장한다.
+3. 조회한 영속 엔티티( `mergeMember` )에 `member` 엔티티의 값을 채워 넣는다. (member 엔티티의 모든 값을
+mergeMember에 밀어 넣는다. 이때 mergeMember의 “회원1”이라는 이름이 “회원명변경”으로 바뀐다.)
+4. 영속 상태인 mergeMember를 반환한다
+
+
+**병합시 동작 방식을 간단히 정리**
+1. 준영속 엔티티의 식별자 값으로 영속 엔티티를 조회한다.
+2. 영속 엔티티의 값을 준영속 엔티티의 값으로 모두 교체한다.(병합한다.)
+3. 트랜잭션 커밋 시점에 변경 감지 기능이 동작해서 데이터베이스에 UPDATE SQL이 실행
+
+>주의: 변경 감지 기능을 사용하면 원하는 속성만 선택해서 변경할 수 있지만, 병합을 사용하면 모든 속성이 변경된 다. 병합시 값이 없으면 `null` 로 업데이트 할 위험도 있다. (병합은 모든 필드를 교체한다.)
+
+```java
+        if (item.getId() == null){
+            em.persist(item);
+        }else {
+            em.merge(item);
+        }
+```
+
+그래서 위처럼 merge로 해결할 수도 있다.
+
+결과적으로 null로 인한 이슈가 발생할 수도 있기 때문에 변경 감지를 쓰는 것이 적합하다.
+
+
+# 주문 컨트롤러 개발
+
+```java
+@Controller
+@RequiredArgsConstructor
+public class OrderController {
+
+    private final OrderService orderService;
+    private final MemberService memberService;
+    private final ItemService itemService;
+
+    @GetMapping("/order")
+    public String createForm(Model model) {
+        List<Member> members = memberService.findMembers();
+        List<Item> items = itemService.findItems();
+
+        model.addAttribute("members", members);
+        model.addAttribute("items", items);
+
+        return "order/orderForm";
+    }
+
+    @PostMapping("/order")
+    public String create(@ModelAttribute OrderDto orderDto) {
+        orderService.order(orderDto.getMemberId(), orderDto.getItemId(), orderDto.getCount());
+        return "redirect:/orders";
+    }
+
+    @GetMapping("/orders")
+    public String orderList(@ModelAttribute("orderSearch") OrderSearch orderSearch, Model model){
+        List<Order> orders = orderService.findOrders(orderSearch);
+        model.addAttribute("orders", orders);
+
+        return "order/orderList";
+    }
+
+    @PostMapping("/orders/{orderId}/cancel")
+    public String cancelOrder(@PathVariable("orderId") Long orderId){
+        orderService.cancelOrder(orderId);
+        return "redirect:/orders";
+    }
+}
+
+```
+
+order를 create할 때 @RequestParam으로 하나 하나 받아도 됐지만 나는 아래처럼 Dto를 만들어 바인딩 했다.
+
+```java
+@Getter
+@Setter
+public class OrderDto {
+    private Long memberId;
+    private Long itemId;
+    private int count;
+}
+
+```
+
+아래는 검색을 위한 검색 DTO이다.
+
+```java
+@Getter @Setter
+public class OrderSearch {
+    private String memberName;
+    private OrderStatus orderStatus;
+
+}
+```
+
+
