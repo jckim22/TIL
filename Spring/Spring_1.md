@@ -2,7 +2,7 @@
 https://start.spring.io/
 ## 프로젝트 선택
 * Project: Gradle Project -> 요즘에는 Gradle, Gradle-Groovy Project
-* group -> 보통 기업명, 단체
+* group -> 보통 기업명, 단체 ㅇ
 * artifactld -> project-name
 * Dependencies -> Spring Web, Thymeleaf(template)
 
