@@ -1,4 +1,4 @@
-[개발자 유미](https://www.youtube.com/watch?v=ZTaZOCqTez4&list=PLJkjrxxiBSFCcOjy0AAVGNtIa08VLk1EJ) 님의 강의를 듣고 [JWT란 무엇인가?](https://velog.io/@hahan/JWT%EB%9E%80-%EB%AC%B4%EC%97%87%EC%9D%B8%EA%B0%80)와 [[SpringBoot] Spring Security란?](https://mangkyu.tistory.com/76)을 참고해 정리한 내용입니다.
+[개발자 유미](https://www.youtube.com/watch?v=ZTaZOCqTez4&list=PLJkjrxxiBSFCcOjy0AAVGNtIa08VLk1EJ) 님의 강의를 듣고 [JWT란 무엇인가?](https://velog.io/@hahan/JWT%EB%9E%80-%EB%AC%B4%EC%97%87%EC%9D%B8%EA%B0%80)와 [[SpringBoot] Spring Security란?](https://mangkyu.tistory.com/76)을 참고해 정리한 내용입니다. 
 
 # Spring Security
 
